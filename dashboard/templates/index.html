@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+{% from "_macros.html" import mitre_badge %}
+{% block title %}{{ "Alerts" if active_page == "alerts" else "Overview" }} · Cloud Triage Lab{% endblock %}
+
+{% block content %}
+  <header class="topbar">
+    <h1>{{ "Alerts" if active_page == "alerts" else "Overview" }}</h1>
+    {% if report %}
+      <span class="muted">{{ report.total_alerts }} alerts · pipeline run {{ report.generated_at }}</span>
+    {% endif %}
+  </header>
+
+  {% if not report %}
+    <section class="empty">
+      <p>No triage report found yet.</p>
+      <p>Run <code>python main.py</code> and refresh this page.</p>
+    </section>
+  {% else %}
+  {% set cov = report.runbook_coverage %}
+
+  {# Overview sections only appear on the Dashboard page. The Alerts page
+     is a focused working view: just the filters and the list. #}
+  {% if active_page == "dashboard" %}
+
+  {# ---- Stale runbook warning. Dismissing hides it for this browser session only. ---- #}
+  {% if cov.stale_runbooks %}
+    <section class="banner" id="stale-banner" role="alert"
+             data-key="{% for s in cov.stale_runbooks %}{{ s.alert_type }}@{{ s.last_reviewed }};{% endfor %}">
+      <svg class="banner-icon" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 2.5 18.5 17h-17z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M10 8v4M10 14.2v.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <div class="banner-text">
+        <strong>
+          {{ cov.stale_runbooks|length }} runbook{{ "s" if cov.stale_runbooks|length != 1 }}
+          past the {{ cov.max_review_age_days }}-day review limit
+        </strong>
+        <ul>
+          {% for s in cov.stale_runbooks %}
+            {% set affected = report.alerts|selectattr("alert_type", "equalto", s.alert_type)|list %}
+            <li>
+              <code>{{ s.alert_type }}</code> last reviewed {{ s.last_reviewed }}
+              ({{ s.age_days }} days ago) · used by {{ affected|length }} alert{{ "s" if affected|length != 1 }}
+              <button type="button" class="link runbook-link" data-alert-type="{{ s.alert_type }}">View runbook</button>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="small">Responders following an outdated runbook may run old commands or page the wrong people.</p>
+      </div>
+      <button type="button" class="icon-button" id="stale-dismiss" aria-label="Dismiss warning">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="m3 3 8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.6"/></svg>
+      </button>
+    </section>
+  {% endif %}
+
+  {# ---- Stats bar. Priority cards double as filter buttons. ---- #}
+  <section class="stats" id="stats">
+    {% for level in ["critical", "high", "medium", "low"] %}
+      {% set count = report.priority_counts[level] %}
+      <button type="button" class="stat stat-priority" data-priority="{{ level }}" aria-pressed="false"
+              title="Show only {{ level }} alerts">
+        <span class="stat-label"><span class="dot {{ level }}"></span>{{ level|capitalize }}</span>
+        <span class="stat-value">{{ count }}</span>
+        <span class="muted small">{{ (100 * count / report.total_alerts)|round|int if report.total_alerts else 0 }}% of queue</span>
+      </button>
+    {% endfor %}
+
+    {% set triaged_pct = (100 * report.triaged_count / report.total_alerts)|round|int if report.total_alerts else 0 %}
+    <div class="stat">
+      <span class="stat-label">Triaged</span>
+      <span class="stat-value"><span id="triaged-count">{{ report.triaged_count }}</span><span class="muted stat-of">/{{ report.total_alerts }}</span></span>
+      <span class="progress" aria-hidden="true"><span id="triaged-bar" style="--pct: {{ triaged_pct }}"></span></span>
+    </div>
+
+    {% set meter_class = "good" if cov.coverage_percent >= 80 else ("warn" if cov.coverage_percent >= 50 else "bad") %}
+    <div class="stat stat-coverage">
+      <span class="stat-label">Runbook coverage</span>
+      <div class="coverage-row">
+        <svg class="meter meter-{{ meter_class }}" viewBox="0 0 64 64" role="img"
+             aria-label="{{ cov.coverage_percent }}% runbook coverage" style="--pct: {{ cov.coverage_percent }}">
+          <circle class="meter-track" cx="32" cy="32" r="26" pathLength="100"/>
+          <circle class="meter-fill" cx="32" cy="32" r="26" pathLength="100"/>
+        </svg>
+        <div>
+          <span class="stat-value"><span id="coverage-value" data-target="{{ cov.coverage_percent }}">{{ cov.coverage_percent }}</span>%</span>
+          <span class="muted small">{{ cov.fully_covered }} of {{ cov.alert_types_seen }} types</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# Stacked bar showing how the queue splits across priorities. #}
+  <div class="distribution" aria-hidden="true">
+    {% for level in ["critical", "high", "medium", "low"] %}
+      {% if report.priority_counts[level] %}
+        <span class="{{ level }}" style="--pct: {{ 100 * report.priority_counts[level] / report.total_alerts }}"
+              title="{{ report.priority_counts[level] }} {{ level }}"></span>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {# ---- Runbook gaps found by the validator ---- #}
+  {% if cov.gaps %}
+    <section class="gaps">
+      <h2>Runbook gaps</h2>
+      <ul>
+        {% for alert_type, gaps in cov.gaps.items() %}
+          <li>
+            <code>{{ alert_type }}</code>
+            <ul>{% for gap in gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+  {% endif %}{# dashboard-only #}
+
+  {# ---- Search and filters (handled in app.js, no page reload) ---- #}
+  <section class="toolbar" aria-label="Filter alerts">
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input id="search" type="search" placeholder="Search resource ID, account, alert type…" autocomplete="off" aria-label="Search alerts">
+    </div>
+    <label class="select">
+      <span>Priority</span>
+      <select id="filter-priority">
+        <option value="">All</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </label>
+    <label class="select">
+      <span>Runbook</span>
+      <select id="filter-runbook">
+        <option value="">All</option>
+        <option value="covered">Covered</option>
+        <option value="partial">Partial</option>
+        <option value="missing">Missing</option>
+      </select>
+    </label>
+    <label class="select">
+      <span>Status</span>
+      <select id="filter-triage">
+        <option value="">All</option>
+        <option value="open">Open</option>
+        <option value="triaged">Triaged</option>
+      </select>
+    </label>
+
+    <div class="toolbar-right">
+      <div class="segmented" role="group" aria-label="View">
+        <button type="button" data-view="queue" aria-pressed="true">Queue</button>
+        <button type="button" data-view="timeline" aria-pressed="false">Timeline</button>
+      </div>
+      {# Export menu: a <details> element works as a dropdown without extra JS. #}
+      <details class="menu" id="export-menu">
+        <summary class="button">
+          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export
+        </summary>
+        <div class="menu-list">
+          <a href="{{ url_for('export_pdf') }}" target="_blank" rel="noopener">
+            <strong>PDF report</strong>
+            <span class="muted small">Printable summary, save with your browser</span>
+          </a>
+          <a href="{{ url_for('export_json') }}">
+            <strong>JSON data</strong>
+            <span class="muted small">Full session: alerts, scores, analyst notes</span>
+          </a>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <div class="view-header">
+    <h2><span id="view-title">Alert queue</span> <span id="shown-count" class="muted"></span></h2>
+  </div>
+
+  {# ---- Queue view: sorted by risk score. Click a row to expand it. ---- #}
+  <section id="view-queue">
+    {% for alert in report.alerts %}
+      {% set e = alert.enrichment %}
+      {% set s = alert.scoring %}
+      {% set v = alert.runbook_validation %}
+      {% set t = alert.triage %}
+      <details class="alert filterable{% if t.triaged %} is-triaged{% endif %}"
+               id="alert-{{ alert.alert_id }}"
+               data-alert-id="{{ alert.alert_id }}"
+               data-priority="{{ s.priority }}"
+               data-runbook="{{ v.status|lower }}"
+               data-triaged="{{ 'triaged' if t.triaged else 'open' }}"
+               data-search="{{ [alert.resource_id, alert.account_id, e.account_name, alert.alert_type, alert.alert_id, alert.title]|join(' ')|lower }}">
+        <summary>
+          <span class="badge {{ s.priority }}">{{ s.priority }}</span>
+          <span class="score" title="Risk score">{{ s.risk_score }}</span>
+          <span class="title">
+            <strong>{{ alert.title }}</strong>
+            <span class="meta">
+              <span>{{ alert.alert_id }}</span>
+              <span>{{ e.account_name }}</span>
+              <span>{{ alert.region }}</span>
+              <code class="resource" title="{{ alert.resource_id }}">{{ alert.resource_id }}</code>
+            </span>
+          </span>
+          <span class="tag triaged-tag">Triaged</span>
+          {{ mitre_badge(e) }}
+          <span class="tag blast-{{ e.blast_radius_level|lower }}"><i></i>Blast {{ e.blast_radius_level }}</span>
+          {% if v.runbook_file %}
+            <button type="button" class="tag rb-{{ v.status|lower }} runbook-link"
+                    data-alert-type="{{ alert.alert_type }}" title="Open runbook"><i></i>Runbook {{ v.status|lower }}</button>
+          {% else %}
+            <span class="tag rb-missing"><i></i>No runbook</span>
+          {% endif %}
+        </summary>
+
+        <div class="detail-grid">
+          <div>
+            <h3>Alert</h3>
+            <dl>
+              <dt>Type</dt><dd><code>{{ alert.alert_type }}</code></dd>
+              <dt>Vendor severity</dt><dd>{{ alert.severity }}</dd>
+              <dt>Resource</dt><dd><code class="wrap">{{ alert.resource_id }}</code></dd>
+              <dt>Account</dt><dd>{{ alert.account_id }}</dd>
+              <dt>Owner</dt><dd>{{ alert.resource_owner }}</dd>
+              <dt>Detected</dt><dd>{{ alert.created_at }}</dd>
+            </dl>
+            <h3>Why this score</h3>
+            <ul class="reasons">{% for r in s.reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+          </div>
+
+          <div>
+            <h3>Blast radius</h3>
+            <p>{{ e.attacker_impact }}</p>
+            <dl>
+              <dt>Scope</dt><dd>{{ e.blast_radius_scope }}</dd>
+              <dt>Environment</dt><dd>{{ e.environment }}</dd>
+              <dt>Data</dt><dd>{{ e.data_classification }}</dd>
+              <dt>Internet exposed</dt><dd>{{ "yes" if e.internet_exposed else "no" }}</dd>
+            </dl>
+            <h3>MITRE ATT&amp;CK</h3>
+            <p class="mitre-detail">
+              {{ mitre_badge(e) }}
+              <span>{{ e.mitre_technique.split(" - ", 1)[-1] }}</span>
+              {% if e.mitre_id != "n/a" %}
+                <a href="https://attack.mitre.org/techniques/{{ e.mitre_id|replace('.', '/') }}/"
+                   target="_blank" rel="noopener" class="small">attack.mitre.org ↗</a>
+              {% endif %}
+            </p>
+            <h3>Connected resources</h3>
+            {% if e.connected_resources %}
+              <ul class="connected">{% for r in e.connected_resources %}<li><code>{{ r }}</code></li>{% endfor %}</ul>
+            {% else %}
+              <p class="muted">None recorded</p>
+            {% endif %}
+            {% for note in e.notes %}<p class="note">{{ note }}</p>{% endfor %}
+          </div>
+
+          <div>
+            <h3>Runbook</h3>
+            {% if v.runbook_file %}
+              <dl>
+                <dt>File</dt><dd><code>runbooks/{{ v.runbook_file }}</code></dd>
+                <dt>Owner</dt><dd>{{ v.runbook_owner }}</dd>
+                <dt>Reviewed</dt><dd>{{ v.last_reviewed }}{% if v.stale %} <span class="stale-pill">stale</span>{% endif %}</dd>
+              </dl>
+            {% endif %}
+            {% if v.gaps %}
+              <ul class="gap-list">{% for gap in v.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+            {% else %}
+              <p class="ok">All required sections present and recently reviewed.</p>
+            {% endif %}
+            {% if v.runbook_file %}
+              <button type="button" class="button runbook-link" data-alert-type="{{ alert.alert_type }}">View runbook</button>
+            {% endif %}
+          </div>
+        </div>
+
+        {# ---- Analyst triage form ---- #}
+        <form class="triage-form" data-alert-id="{{ alert.alert_id }}">
+          <h3>Analyst triage</h3>
+          <p class="triage-status muted small">
+            {% if t.triaged %}Triaged by {{ t.analyst }} at {{ t.triaged_at }}{% else %}Not triaged yet{% endif %}
+          </p>
+          <div class="triage-fields">
+            <input name="analyst" type="text" placeholder="Analyst name" maxlength="60" value="{{ t.analyst }}">
+            <textarea name="notes" rows="3" maxlength="2000"
+                      placeholder="Findings, actions taken, who you contacted…">{{ t.notes }}</textarea>
+          </div>
+          <div class="triage-actions">
+            <button type="submit" class="button primary">{{ "Update notes" if t.triaged else "Mark as triaged" }}</button>
+            <button type="button" class="button reopen"{% if not t.triaged %} hidden{% endif %}>Reopen</button>
+            <span class="form-message small" role="status"></span>
+          </div>
+        </form>
+      </details>
+    {% endfor %}
+  </section>
+
+  {# ---- Timeline view: same alerts, ordered by detection time, newest first. ---- #}
+  <section id="view-timeline" hidden>
+    {% for day, day_alerts in timeline %}
+      <div class="tl-day">
+        <h3 class="tl-date">{{ day }} <span class="muted">· {{ day_alerts|length }} alert{{ "s" if day_alerts|length != 1 }}</span></h3>
+        <ol class="tl-list">
+          {% for alert in day_alerts %}
+            {% set e = alert.enrichment %}
+            {% set v = alert.runbook_validation %}
+            <li class="tl-item filterable{% if alert.triage.triaged %} is-triaged{% endif %}"
+                data-alert-id="{{ alert.alert_id }}"
+                data-priority="{{ alert.scoring.priority }}"
+                data-runbook="{{ v.status|lower }}"
+                data-triaged="{{ 'triaged' if alert.triage.triaged else 'open' }}"
+                data-search="{{ [alert.resource_id, alert.account_id, e.account_name, alert.alert_type, alert.alert_id, alert.title]|join(' ')|lower }}">
+              <span class="tl-dot {{ alert.scoring.priority }}" aria-hidden="true"></span>
+              <button type="button" class="tl-card" data-open-alert="{{ alert.alert_id }}">
+                <time datetime="{{ alert.created_at }}">{{ alert.created_at[11:16] }} UTC</time>
+                <span class="tl-main">
+                  <strong>{{ alert.title }}</strong>
+                  <span class="meta">
+                    <span>{{ alert.alert_id }}</span>
+                    <span>{{ e.account_name }}</span>
+                    <code class="resource" title="{{ alert.resource_id }}">{{ alert.resource_id }}</code>
+                  </span>
+                </span>
+                <span class="tl-tags">
+                  <span class="badge small-badge {{ alert.scoring.priority }}">{{ alert.scoring.priority }}</span>
+                  {{ mitre_badge(e) }}
+                  <span class="tag triaged-tag">Triaged</span>
+                  {% if v.status != "COVERED" %}<span class="tag rb-{{ v.status|lower }}"><i></i>Runbook {{ v.status|lower }}</span>{% endif %}
+                </span>
+              </button>
+            </li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% endfor %}
+  </section>
+
+  <p id="no-results" class="empty" hidden>No alerts match these filters.</p>
+  {% endif %}
+
+{% endblock %}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Triage Session Report</title>
+  <style>
+    /* Light, print-friendly styles. Kept inline so the page is self-contained. */
+    body { font: 12px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #111; background: #fff; margin: 0; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 14px; margin: 24px 0 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    .muted { color: #555; }
+    .summary { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; }
+    .summary div { min-width: 90px; }
+    .summary strong { display: block; font-size: 18px; }
+    code { font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; }
+    .alert { border: 1px solid #ccc; border-left-width: 4px; padding: 8px 12px; margin-bottom: 10px; break-inside: avoid; }
+    .alert.critical { border-left-color: #c62828; }
+    .alert.high { border-left-color: #e65100; }
+    .alert.medium { border-left-color: #c9a400; }
+    .alert.low { border-left-color: #2e7d57; }
+    .alert-head { display: flex; justify-content: space-between; gap: 12px; }
+    .alert-head strong { font-size: 13px; }
+    table { border-collapse: collapse; margin-top: 6px; width: 100%; }
+    td { padding: 2px 8px 2px 0; vertical-align: top; }
+    td:first-child { color: #555; width: 110px; white-space: nowrap; }
+    .notes { white-space: pre-wrap; margin: 6px 0 0; padding: 6px 8px; background: #f4f4f4; }
+    .print-bar { background: #eef4fa; padding: 10px 16px; text-align: center; }
+    @media print { .print-bar { display: none; } main { padding: 0; } }
+  </style>
+</head>
+<body>
+<div class="print-bar">
+  Use your browser's print dialog and choose <strong>Save as PDF</strong>.
+  <button type="button" onclick="window.print()">Print / Save as PDF</button>
+</div>
+<main>
+  <h1>Cloud Triage Lab: Triage Session Report</h1>
+  <p class="muted">Exported {{ exported_at }} · pipeline run {{ report.generated_at }}</p>
+
+  {% set cov = report.runbook_coverage %}
+  <div class="summary">
+    <div><strong>{{ report.total_alerts }}</strong>alerts</div>
+    <div><strong>{{ report.triaged_count }}</strong>triaged</div>
+    <div><strong>{{ report.total_alerts - report.triaged_count }}</strong>open</div>
+    {% for level in ["critical", "high", "medium", "low"] %}
+      <div><strong>{{ report.priority_counts[level] }}</strong>{{ level }}</div>
+    {% endfor %}
+    <div><strong>{{ cov.coverage_percent }}%</strong>runbook coverage</div>
+  </div>
+
+  {% if cov.gaps %}
+    <h2>Runbook gaps</h2>
+    <ul>
+      {% for alert_type, gaps in cov.gaps.items() %}
+        <li><code>{{ alert_type }}</code>: {{ gaps|join("; ") }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <h2>Alerts (highest priority first)</h2>
+  {% for alert in report.alerts %}
+    {% set e = alert.enrichment %}
+    {% set t = alert.triage %}
+    <div class="alert {{ alert.scoring.priority }}">
+      <div class="alert-head">
+        <strong>{{ alert.scoring.priority|upper }} ({{ alert.scoring.risk_score }}) · {{ alert.title }}</strong>
+        <span>{{ "Triaged" if t.triaged else "Open" }}</span>
+      </div>
+      <table>
+        <tr><td>Alert ID</td><td>{{ alert.alert_id }} · <code>{{ alert.alert_type }}</code></td></tr>
+        <tr><td>Resource</td><td><code>{{ alert.resource_id }}</code></td></tr>
+        <tr><td>Account</td><td>{{ alert.account_id }} ({{ e.account_name }}) · {{ alert.region }} · owner {{ alert.resource_owner }}</td></tr>
+        <tr><td>Blast radius</td><td>{{ e.blast_radius_level }} ({{ e.blast_radius_scope }} scope): {{ e.attacker_impact }}</td></tr>
+        <tr><td>ATT&amp;CK</td><td>{{ e.mitre_technique }}</td></tr>
+        <tr><td>Runbook</td><td>{{ alert.runbook_validation.status }}{% if alert.runbook_validation.gaps %}: {{ alert.runbook_validation.gaps|join("; ") }}{% endif %}</td></tr>
+        {% if t.triaged %}
+          <tr><td>Triaged</td><td>{{ t.triaged_at }} by {{ t.analyst }}</td></tr>
+        {% endif %}
+      </table>
+      {% if t.notes %}<p class="notes">{{ t.notes }}</p>{% endif %}
+    </div>
+  {% endfor %}
+</main>
+<script>
+  // Open the print dialog automatically once the page has rendered.
+  window.addEventListener("load", () => window.print());
+</script>
+</body>
+</html>

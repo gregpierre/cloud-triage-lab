@@ -1,0 +1,21 @@
+[
+  {
+    "alert_id": "WIZ-2026-1005",
+    "alert_type": "CLOUDTRAIL_DISABLED",
+    "title": "CloudTrail logging disabled",
+    "severity": "HIGH",
+    "status": "OPEN",
+    "source": "wiz",
+    "resource_id": "arn:aws:cloudtrail:us-east-1:777788889999:trail/org-audit-trail",
+    "resource_type": "AWS::CloudTrail::Trail",
+    "account_id": "777788889999",
+    "region": "us-east-1",
+    "resource_owner": "cloud-security",
+    "created_at": "2026-10-15T02:44:12Z",
+    "evidence": {
+      "event_name": "StopLogging",
+      "performed_by": "arn:aws:iam::777788889999:role/break-glass-admin",
+      "is_organization_trail": true
+    }
+  }
+]

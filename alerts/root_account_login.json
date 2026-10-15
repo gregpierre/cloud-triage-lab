@@ -1,0 +1,22 @@
+[
+  {
+    "alert_id": "WIZ-2026-1004",
+    "alert_type": "ROOT_ACCOUNT_LOGIN",
+    "title": "Root account login detected",
+    "severity": "CRITICAL",
+    "status": "OPEN",
+    "source": "wiz",
+    "resource_id": "arn:aws:iam::111122223333:root",
+    "resource_type": "AWS::IAM::RootAccount",
+    "account_id": "111122223333",
+    "region": "global",
+    "resource_owner": "cloud-security",
+    "created_at": "2026-10-15T02:31:57Z",
+    "evidence": {
+      "event_name": "ConsoleLogin",
+      "source_ip": "203.0.113.45",
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64)",
+      "mfa_used": false
+    }
+  }
+]

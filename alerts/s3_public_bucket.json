@@ -1,0 +1,40 @@
+[
+  {
+    "alert_id": "WIZ-2026-1002",
+    "alert_type": "S3_PUBLIC_BUCKET",
+    "title": "S3 bucket publicly accessible",
+    "severity": "HIGH",
+    "status": "OPEN",
+    "source": "wiz",
+    "resource_id": "arn:aws:s3:::acme-customer-exports",
+    "resource_type": "AWS::S3::Bucket",
+    "account_id": "111122223333",
+    "region": "us-east-1",
+    "resource_owner": "data-platform",
+    "created_at": "2026-10-14T21:03:10Z",
+    "evidence": {
+      "block_public_access": false,
+      "bucket_policy_principal": "*",
+      "allowed_actions": ["s3:GetObject", "s3:ListBucket"]
+    }
+  },
+  {
+    "alert_id": "WIZ-2026-1003",
+    "alert_type": "S3_PUBLIC_BUCKET",
+    "title": "S3 bucket publicly accessible",
+    "severity": "HIGH",
+    "status": "OPEN",
+    "source": "wiz",
+    "resource_id": "arn:aws:s3:::acme-marketing-site-assets",
+    "resource_type": "AWS::S3::Bucket",
+    "account_id": "111122223333",
+    "region": "us-east-1",
+    "resource_owner": "web-marketing",
+    "created_at": "2026-10-13T16:47:29Z",
+    "evidence": {
+      "block_public_access": false,
+      "bucket_policy_principal": "*",
+      "allowed_actions": ["s3:GetObject"]
+    }
+  }
+]

@@ -1,0 +1,53 @@
+{
+  "_comment": "Simulated asset inventory / CMDB. In a real environment this context would come from Wiz's Security Graph or an internal asset database.",
+  "accounts": {
+    "111122223333": {"name": "acme-prod", "environment": "production"},
+    "444455556666": {"name": "acme-dev-sandbox", "environment": "development"},
+    "777788889999": {"name": "acme-security-logging", "environment": "production"}
+  },
+  "resources": {
+    "arn:aws:iam::111122223333:policy/legacy-deploy-admin": {
+      "description": "Legacy deploy policy from the old Jenkins pipeline",
+      "data_classification": "restricted",
+      "internet_exposed": false,
+      "connected_resources": ["role/ci-deploy-runner", "user/svc-legacy-jenkins"]
+    },
+    "arn:aws:s3:::acme-customer-exports": {
+      "description": "Nightly CSV exports of customer records for the analytics team",
+      "data_classification": "restricted",
+      "internet_exposed": true,
+      "connected_resources": ["lambda/nightly-export-job", "role/analytics-reader"]
+    },
+    "arn:aws:s3:::acme-marketing-site-assets": {
+      "description": "Images and CSS for the public marketing website",
+      "data_classification": "public",
+      "internet_exposed": true,
+      "expected_public": true,
+      "connected_resources": ["cloudfront/E2EXAMPLE123"]
+    },
+    "arn:aws:iam::111122223333:root": {
+      "description": "Root user of the production account",
+      "data_classification": "restricted",
+      "internet_exposed": true,
+      "connected_resources": []
+    },
+    "arn:aws:cloudtrail:us-east-1:777788889999:trail/org-audit-trail": {
+      "description": "Organization-wide CloudTrail feeding the SIEM",
+      "data_classification": "confidential",
+      "internet_exposed": false,
+      "connected_resources": ["s3/acme-org-cloudtrail-logs", "siem/log-ingest"]
+    },
+    "sg-0a1b2c3d4e5f60718": {
+      "description": "Security group for the production SSH bastion host",
+      "data_classification": "internal",
+      "internet_exposed": true,
+      "connected_resources": ["i-0123456789abcdef0", "i-0fedcba9876543210"]
+    },
+    "sg-0f9e8d7c6b5a40321": {
+      "description": "Throwaway security group in the intern sandbox account",
+      "data_classification": "internal",
+      "internet_exposed": true,
+      "connected_resources": ["i-0aaaabbbbccccdddd"]
+    }
+  }
+}

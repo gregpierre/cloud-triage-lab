@@ -1,0 +1,7 @@
+{# MITRE ATT&CK badge, colored by tactic. Reused in the queue, details, and timeline. #}
+{% macro mitre_badge(e) -%}
+  <span class="mitre tactic-{{ e.mitre_tactic|lower|replace(' ', '-') }}"
+        title="{{ e.mitre_technique }} ({{ e.mitre_tactic }})">
+    <span class="mitre-id">{{ e.mitre_id }}</span><span class="mitre-tactic">{{ e.mitre_tactic }}</span>
+  </span>
+{%- endmacro %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Runbooks · Cloud Triage Lab{% endblock %}
+
+{% block content %}
+  <header class="topbar">
+    <h1>Runbooks</h1>
+    <span class="muted">{{ rows|length }} alert types · review limit {{ max_age }} days</span>
+  </header>
+
+  <section class="stats stats-compact">
+    <div class="stat">
+      <span class="stat-label"><span class="dot low"></span>Covered</span>
+      <span class="stat-value">{{ counts.COVERED }}</span>
+      <span class="small">Complete and recently reviewed</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label"><span class="dot high"></span>Needs work</span>
+      <span class="stat-value">{{ counts.PARTIAL }}</span>
+      <span class="small">Missing sections or stale</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label"><span class="dot critical"></span>Missing</span>
+      <span class="stat-value">{{ counts.MISSING }}</span>
+      <span class="small">Alert type has no runbook</span>
+    </div>
+  </section>
+
+  <div class="view-header">
+    <h2>All runbooks <span class="muted sub">· problems first</span></h2>
+  </div>
+
+  {# Wide table; on small screens it scrolls sideways inside its own box. #}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Runbook</th>
+          <th>Owner</th>
+          <th>Last reviewed</th>
+          <th>Alerts</th>
+          <th>Gaps</th>
+          <th><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr class="rb-row status-{{ r.status|lower }}">
+            <td><span class="tag rb-{{ r.status|lower }}"><i></i>{{ r.status|lower }}</span></td>
+            <td>
+              <strong>{{ r.runbook_title or "No runbook" }}</strong>
+              <span class="meta">
+                <code>{{ r.alert_type }}</code>
+                {% if r.runbook_file %}<code>runbooks/{{ r.runbook_file }}</code>{% endif %}
+              </span>
+            </td>
+            <td>{{ r.runbook_owner or "—" }}</td>
+            <td class="nowrap">
+              {% if r.last_reviewed %}
+                {{ r.last_reviewed }}
+                <span class="meta">
+                  <span>{{ r.review_age_days }} days ago</span>
+                  {% if r.stale %}<span class="stale-pill">stale</span>{% endif %}
+                </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="nowrap">
+              {% if r.alert_count %}
+                <a class="alert-count" href="{{ url_for('alerts_page') }}?type={{ r.alert_type }}">
+                  {% if r.top_priority %}<span class="dot {{ r.top_priority }}" title="Highest priority: {{ r.top_priority }}"></span>{% endif %}
+                  {{ r.alert_count }} alert{{ "s" if r.alert_count != 1 }}
+                </a>
+                <span class="meta"><span>{{ r.open_count }} open</span></span>
+              {% else %}
+                <span class="muted">none</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.gaps %}
+                <ul class="gap-list">{% for gap in r.gaps %}<li>{{ gap }}</li>{% endfor %}</ul>
+              {% else %}
+                <span class="ok">None</span>
+              {% endif %}
+            </td>
+            <td class="nowrap">
+              {% if r.runbook_file %}
+                <button type="button" class="button runbook-link" data-alert-type="{{ r.alert_type }}">View</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
